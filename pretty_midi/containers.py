@@ -1,6 +1,7 @@
 """These classes simply hold MIDI data in a convenient form.
 
 """
+from __future__ import print_function
 
 from .utilities import key_number_to_key_name
 
@@ -26,6 +27,14 @@ class Note(object):
         self.pitch = pitch
         self.start = start
         self.end = end
+
+    def get_duration(self):
+        """Get the duration of the note in seconds."""
+        return self.end - self.start
+
+    @property
+    def duration(self):
+        return self.get_duration()
 
     def __repr__(self):
         return 'Note(start={:f}, end={:f}, pitch={}, velocity={})'.format(
@@ -94,7 +103,7 @@ class TimeSignature(object):
     Instantiate a TimeSignature object with 6/8 time signature at 3.14 seconds:
 
     >>> ts = TimeSignature(6, 8, 3.14)
-    >>> print ts
+    >>> print(ts)
     6/8 at 3.14 seconds
 
     """
@@ -142,7 +151,7 @@ class KeySignature(object):
     Instantiate a C# minor KeySignature object at 3.14 seconds:
 
     >>> ks = KeySignature(13, 3.14)
-    >>> print ks
+    >>> print(ks)
     C# minor at 3.14 seconds
     """
 
@@ -179,6 +188,7 @@ class Lyric(object):
     time : float
         The time in seconds of the lyric.
     """
+
     def __init__(self, text, time):
         self.text = text
         self.time = time

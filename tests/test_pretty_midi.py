@@ -132,6 +132,16 @@ def test_get_downbeats():
                                np.arange(expected_beats[-1] + 3*60./change_bpm,
                                          pm.get_end_time(), 3*60./change_bpm))
     assert np.allclose(pm.get_downbeats(2.2), expected_beats)
+    # Test for compound meters
+    pm = pretty_midi.PrettyMIDI()
+    # Add a note to force get_end_time() to be non-zero
+    i = pretty_midi.Instrument(0)
+    i.notes.append(pretty_midi.Note(100, 100, 0.3, 20.4))
+    pm.instruments.append(i)
+    # Simple test, assume 6/8 time for the entire piece
+    pm.time_signature_changes.append(pretty_midi.TimeSignature(6, 8, 0))
+    assert np.allclose(pm.get_downbeats(),
+                       np.arange(0, pm.get_end_time(), 3*60./120.))
 
 
 def test_adjust_times():
@@ -162,9 +172,9 @@ def test_adjust_times():
     assert np.allclose(
         [n.start for n in pm.instruments[0].notes], expected_starts)
     pm = simple()
-    pm.adjust_times([0, 5, 5, 10], [5, 10, 12, 17])
+    pm.adjust_times([0, 5, 5, 10], [7, 12, 13, 17])
     # Original times  [1, 2, 3, 4,  5,  6,  7,  8,  9]
-    expected_starts = [6, 7, 8, 9, 12, 13, 14, 15, 16]
+    expected_starts = [8, 9, 10, 11, 12, 13, 14, 15, 16]
     assert np.allclose(
         [n.start for n in pm.instruments[0].notes], expected_starts)
 
@@ -233,11 +243,19 @@ def test_adjust_times():
     assert np.allclose(expected_tempi, tempi, rtol=.002)
 
     # Test that all other events were interpolated as expected
-    note_starts = [5., 5 + 1/1.1, 7 + .9/(2/1.5), 7 + 1.9/(2/1.5), 8.5 + .5,
+    note_starts = [5.0,
+                   5 + 1/1.1,
+                   6 + .9/(2/2.5),
+                   6 + 1.9/(2/2.5),
+                   8.5 + .5,
                    8.5 + 1.5]
-    note_ends = [5 + .5/1.1, 7 + .4/(2/1.5), 7 + 1.4/(2/1.5), 8.5, 9 + .5,
+    note_ends = [5 + .5/1.1,
+                 6 + .4/(2/2.5),
+                 6 + 1.4/(2/2.5),
+                 8.5,
+                 8.5 + 1.,
                  10 + .5]
-    note_pitches = [101, 102, 103, 104, 107, 108, 109]
+    note_pitches = [101, 102, 103, 104, 107, 108]
     for note, s, e, p in zip(pm.instruments[0].notes, note_starts, note_ends,
                              note_pitches):
         assert note.start == s
@@ -262,11 +280,11 @@ def test_adjust_times():
     # downbeat location - so, start by computing the location of the first
     # downbeat after the start of original_times, then interpolate it
     first_downbeat_after = .1 + 2*3*60./100.
-    first_ts_time = 7 + (first_downbeat_after - 3.1)/(2/1.5)
+    first_ts_time = 6. + (first_downbeat_after - 3.1)/(2./2.5)
     ts_times = [first_ts_time, 8.5, 8.5]
     ts_numerators = [3, 4, 6]
     for ts, t, n in zip(pm.time_signature_changes, ts_times, ts_numerators):
-        assert ts.time == t
+        assert np.isclose(ts.time, t)
         assert ts.numerator == n
 
     ks_times = [5., 8.5, 8.5]
@@ -458,6 +476,20 @@ def test_get_piano_roll_and_get_chroma():
     expected_chroma[7, 30:50] = 50
     assert np.allclose(pm.get_chroma(),
                        expected_chroma)
+
+
+def test_get_piano_roll_integrated():
+    pm = pretty_midi.PrettyMIDI()
+    inst = pretty_midi.Instrument(0)
+    pm.instruments.append(inst)
+    inst.notes.append(pretty_midi.Note(pitch=70, velocity=90, start=0.01,
+                                       end=0.05))
+    times = np.linspace(0., 0.06, num=12, endpoint=False)  # sampling at 200
+    # piano roll samples at 100, needs to interpolate to 200
+    piano_roll = pm.instruments[0].get_piano_roll(fs=100, times=times)
+    expected_piano_roll = np.zeros((128, 12))
+    expected_piano_roll[70, 2:10] = 90.
+    assert np.allclose(piano_roll, expected_piano_roll)
 
 
 def test_synthesize():
